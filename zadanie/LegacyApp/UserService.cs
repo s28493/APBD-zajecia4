@@ -19,56 +19,36 @@ namespace LegacyApp
     {
         private IClientRepository _clientRepository;
         private ICreditLimitService _creditService;
+        private IUserDataAccessAdapter _userDataAccessAdapter;
 
         [Obsolete]
         public UserService()
         {
             _clientRepository = new ClientRepository();
             _creditService = new UserCreditService();
-        }
-        public UserService(IClientRepository clientRepository, ICreditLimitService creditService)
-        {
-            _clientRepository = clientRepository;
-            _creditService = creditService;
+            _userDataAccessAdapter = new UserDataAccessAdapter();
         }
         
         public bool AddUser(string firstName, string lastName, string email, DateTime dateOfBirth, int clientId)
         {
-            //Logika biznesowa - walidacja
-            if (string.IsNullOrEmpty(firstName) || string.IsNullOrEmpty(lastName))
-            {
+            //WALIDACJA
+            if (!User.ValidateUser(firstName,lastName,email,dateOfBirth))
                 return false;
-            }
-            
-            //Logika biznesowa - walidacja
-            if (!email.Contains("@") && !email.Contains("."))
-            {
-                return false;
-            }
-            
-            //Logika biznesowa 
-            var now = DateTime.Now;
-            int age = now.Year - dateOfBirth.Year;
-            if (now.Month < dateOfBirth.Month || (now.Month == dateOfBirth.Month && now.Day < dateOfBirth.Day)) age--;
-
-            if (age < 21)
-            {
-                return false;
-            }
-
             //Infrastruktura
             var client = _clientRepository.GetById(clientId);
-
-            var user = new User
-            {
-                Client = client,
-                DateOfBirth = dateOfBirth,
-                EmailAddress = email,
-                FirstName = firstName,
-                LastName = lastName
-            };
-
+            var user = User.CreateUser(client, dateOfBirth, email, firstName, lastName);
             //Logika biznesowa + infrastruktura
+            SetUserCreditLimit(user, client);
+            //Logika biznesowa
+            if (!User.IsBigEnoughUserCreditLimit(user))
+                return false;
+            //infrastruktura
+            _userDataAccessAdapter.AddUser(user);
+            return true;
+        }
+        
+        private void SetUserCreditLimit(User user, Client client)
+        {
             if (client.Type == "VeryImportantClient")
             {
                 user.HasCreditLimit = false;
@@ -86,16 +66,6 @@ namespace LegacyApp
                 user.CreditLimit = creditLimit;
   
             }
-
-            //Logika biznesowa
-            if (user.HasCreditLimit && user.CreditLimit < 500)
-            {
-                return false;
-            }
-
-            //infrastruktura
-            UserDataAccess.AddUser(user);
-            return true;
         }
     }
 }
