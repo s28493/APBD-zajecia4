@@ -2,19 +2,6 @@
 
 namespace LegacyApp
 {
-    public interface ICreditLimitService
-    {
-        int GetCreditLimit(string lastName, DateTime birthdate);
-    }
-    public interface IClientRepository
-    {
-        Client GetById(int idClient);
-    }
-    public interface IUserDataAccessAdapter
-    {
-        void AddUser(User user);
-    }
-    
     public class UserService
     {
         private IClientRepository _clientRepository;
